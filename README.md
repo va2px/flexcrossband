@@ -1,5 +1,5 @@
-Flex radio crossband repeater
-=============================
+Crossband repeater software for Flex radio
+==========================================
 Author:  Martin Berube  VA2PX
 email:   ve2nmb@gmail.com
 version: 0.1

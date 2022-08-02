@@ -2,7 +2,7 @@
     ==========================================
     Author:  Martin Berube  VA2PX
     email:   ve2nmb@gmail.com
-    version: 0.1
+    version: 0.2
     
     Perequisite:
     
@@ -14,12 +14,13 @@
     
     Summary:
     
-    This softwaretransform your flexradio info a crossband repeater.  It will retransmit what it received on slace A and retransmit it on slice B and vice versa.  It utilises the "Level Meter Mute" of frstack3 software and send commands to te transciver via its REST API.  The programm uses DAX for audio reception and retransmition.  Crossband repeat in VHF/UHF is possible with transverters for these bands.
+    This software transform your flexradio info a crossband repeater.  It will retransmit what it received on slace A and retransmit it on slice B and vice versa.  It utilises the "Level Meter Mute" of frstack3 software and send commands to te transciver via its REST API.  The programm uses DAX for audio reception and retransmition.  Crossband repeat in VHF/UHF is possible with transverters for these bands.
     
 '''
 import urllib.request
 import soundcard as sc
 import time
+import json
 
 # Set up required paramaters in the transceiver
 def setup():
@@ -45,28 +46,24 @@ def loop():
     
     while True:
         muteAstat = urllib.request.urlopen('http://localhost:13522/api/Slice/A/MUTE')
+        line = json.loads(muteAstat.read().decode())
 
         # Check mute state of slice A
-        for line in muteAstat:
-            line = line.decode().rstrip()
-
-            if line == '\"OFF\"':
-                # Set TX to slice B and enable MOX
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/B/TX?param=1')
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
+        if line == 'OFF':
+            # Set TX to slice B and enable MOX
+            cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/B/TX?param=1')
+            cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
                                 
-                print('Crossband transmit A -> B ') #Cosmetic
+            print('Crossband transmit A -> B ') #Cosmetic
                 
-                # Start sound passover and keep sending sound while Mute is OFF.
-                with DAXrx1.recorder(samplerate=48000) as mic, default_speaker.player(samplerate=48000) as sp:
-                    # Check mute state of slice A
-                    while line == '\"OFF\"':
-                        sp.play(mic.record(numframes=None))
+            # Start sound passover and keep sending sound while Mute is OFF.
+            with DAXrx1.recorder(samplerate=48000) as mic, default_speaker.player(samplerate=48000) as sp:
+                # Check mute state of slice A
+                while line == 'OFF':
+                    sp.play(mic.record(numframes=None))
                         
-                        muteAstat = urllib.request.urlopen('http://localhost:13522/api/Slice/A/MUTE')
-                    
-                        for line in muteAstat:
-                            line = line.decode().rstrip()
+                    muteAstat = urllib.request.urlopen('http://localhost:13522/api/Slice/A/MUTE')
+                    line = json.loads(muteAstat.read().decode())
                 
                 # Turn off MOX after 1 second wait.
                 time.sleep(1)
@@ -75,28 +72,24 @@ def loop():
                 print('Listening\r\n')   #Cosmetic
 
         muteBstat = urllib.request.urlopen('http://localhost:13522/api/Slice/B/MUTE')
+        line = json.loads(muteBstat.read().decode())
 
         # Check mute state of slice B
-        for line in muteBstat:
-            line = line.decode().rstrip()
-            
-            if line == '\"OFF\"':
-                # Set TX to slice B and enable MOX
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/A/TX?param=1')
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
+        if line == 'OFF':
+            # Set TX to slice B and enable MOX
+            cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/A/TX?param=1')
+            cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
                 
-                print('Crossband transmit B -> A') #Cosmetic
+            print('Crossband transmit B -> A') #Cosmetic
                 
-                # Start sound passover and keep sending sound while Mute is OFF.
-                with DAXrx2.recorder(samplerate=48000) as mic, default_speaker.player(samplerate=48000) as sp:
-                    # Check mute state of slice B
-                    while line == '\"OFF\"':                    
-                        sp.play(mic.record(numframes=None))
+            # Start sound passover and keep sending sound while Mute is OFF.
+            with DAXrx2.recorder(samplerate=48000) as mic, default_speaker.player(samplerate=48000) as sp:
+                # Check mute state of slice B
+                while line == 'OFF':                    
+                    sp.play(mic.record(numframes=None))
                         
-                        muteBstat = urllib.request.urlopen('http://localhost:13522/api/Slice/B/MUTE')
-                    
-                        for line in muteBstat:
-                            line = line.decode().rstrip()
+                    muteBstat = urllib.request.urlopen('http://localhost:13522/api/Slice/B/MUTE')
+                    line = json.loads(muteBstat.read().decode())
                             
                 # Turn off MOX after 1 second wait.
                 time.sleep(1)                

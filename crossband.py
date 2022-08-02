@@ -2,7 +2,9 @@
     ==========================================
     Author:  Martin Berube  VA2PX
     email:   ve2nmb@gmail.com
-    version: 0.2
+    version: 0.3
+    
+    Syntax:  python crossband.py [frstack_address]
     
     Perequisite:
     
@@ -21,22 +23,42 @@ import urllib.request
 import soundcard as sc
 import time
 import json
+import sys
 
 # Set up required paramaters in the transceiver
-def setup():
-    cmdA = urllib.request.urlopen('http://localhost:13522/api/Slice/A/DAX?PARAM=1')
-    cmdB = urllib.request.urlopen('http://localhost:13522/api/Slice/B/DAX?PARAM=2')
-    cmdFDX = urllib.request.urlopen('http://localhost:13522/api/Radio/FDX?PARAM=1')
-    cmdDAX = urllib.request.urlopen('http://localhost:13522/api/Radio/DAX?PARAM=1')
+def setup(argv):
+    try:
+        if argv[1]:
+            frstackloc = argv[1]
+    except:
+        frstackloc = 'localhost'
+        
+    #FRStack URLs definitions    
+    daxAto1 = 'http://'+frstackloc+':13522/api/Slice/A/DAX?PARAM=1'
+    daxBto2 = 'http://'+frstackloc+':13522/api/Slice/B/DAX?PARAM=2'
+    FDXto1 = 'http://'+frstackloc+':13522/api/Radio/FDX?PARAM=1'
+    DAXto1 = 'http://'+frstackloc+':13522/api/Radio/DAX?PARAM=1'
+        
+    cmdA = urllib.request.urlopen(daxAto1)
+    cmdB = urllib.request.urlopen(daxBto2)
+    cmdFDX = urllib.request.urlopen(FDXto1)
+    cmdDAX = urllib.request.urlopen(DAXto1)
     
-    return
+    return(frstackloc)
 
 # This function listen on both slice.  When a slice get unmuted, its audio is transmitted over the other slice.    
-def loop():
+def loop(frstackloc,MOXto0):
     # Soundcard parameters definition
     default_speaker = sc.get_speaker('DAX Audio TX')
     DAXrx1 = sc.get_microphone('Audio RX 1')
     DAXrx2 = sc.get_microphone('Audio RX 2')
+    
+    #FRStack URLs definitions
+    MOXto1 = 'http://'+frstackloc+':13522/api/Radio/MOX?PARAM=1'
+    TxA = 'http://'+frstackloc+':13522/api/Slice/A/TX?param=1'
+    TxB = 'http://'+frstackloc+':13522/api/Slice/B/TX?param=1'
+    MuteA = 'http://'+frstackloc+':13522/api/Slice/A/MUTE'
+    MuteB = 'http://'+frstackloc+':13522/api/Slice/B/MUTE'
     
     print(DAXrx1)
     print(DAXrx2)
@@ -45,14 +67,14 @@ def loop():
     print('Crossband initiated - Listening')
     
     while True:
-        muteAstat = urllib.request.urlopen('http://localhost:13522/api/Slice/A/MUTE')
+        muteAstat = urllib.request.urlopen(MuteA)
         line = json.loads(muteAstat.read().decode())
 
         # Check mute state of slice A
         if line == 'OFF':
             # Set TX to slice B and enable MOX
-            cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/B/TX?param=1')
-            cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
+            cmd = urllib.request.urlopen(TxB)
+            cmd = urllib.request.urlopen(MOXto1)
                                 
             print('Crossband transmit A -> B ') #Cosmetic
                 
@@ -62,23 +84,23 @@ def loop():
                 while line == 'OFF':
                     sp.play(mic.record(numframes=None))
                         
-                    muteAstat = urllib.request.urlopen('http://localhost:13522/api/Slice/A/MUTE')
+                    muteAstat = urllib.request.urlopen(MuteA)
                     line = json.loads(muteAstat.read().decode())
                 
                 # Turn off MOX after 1 second wait.
                 time.sleep(1)
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=0')
+                cmd = urllib.request.urlopen(MOXto0)
                 
                 print('Listening\r\n')   #Cosmetic
 
-        muteBstat = urllib.request.urlopen('http://localhost:13522/api/Slice/B/MUTE')
+        muteBstat = urllib.request.urlopen(MuteB)
         line = json.loads(muteBstat.read().decode())
 
         # Check mute state of slice B
         if line == 'OFF':
             # Set TX to slice B and enable MOX
-            cmd = urllib.request.urlopen('http://localhost:13522/api/Slice/A/TX?param=1')
-            cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=1')
+            cmd = urllib.request.urlopen(TxA)
+            cmd = urllib.request.urlopen(MOXto1)
                 
             print('Crossband transmit B -> A') #Cosmetic
                 
@@ -88,23 +110,28 @@ def loop():
                 while line == 'OFF':                    
                     sp.play(mic.record(numframes=None))
                         
-                    muteBstat = urllib.request.urlopen('http://localhost:13522/api/Slice/B/MUTE')
+                    muteBstat = urllib.request.urlopen(MuteB)
                     line = json.loads(muteBstat.read().decode())
                             
                 # Turn off MOX after 1 second wait.
                 time.sleep(1)                
-                cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=0')
+                cmd = urllib.request.urlopen(MOXto0)
                 
                 print('Listening')   #Cosmetic 
     
 if __name__ == '__main__':     # Program entrance
-    setup()
+    frstackloc = setup(sys.argv)
     
+    #FRStack URLs definitions
+    MOXto0 = 'http://'+frstackloc+':13522/api/Radio/MOX?PARAM=0'
+    FDXto0 = 'http://'+frstackloc+':13522/api/Radio/FDX?PARAM=0'
+    DAXto0 = 'http://'+frstackloc+':13522/api/Radio/DAX?PARAM=0'
+
     try:
-        loop()
+        loop(frstackloc,MOXto0)
 
     except KeyboardInterrupt:  # Press ctrl-c to end the program.
         # Clean up
-        cmd = urllib.request.urlopen('http://localhost:13522/api/Radio/MOX?PARAM=0')
-        cmdFDX = urllib.request.urlopen('http://localhost:13522/api/Radio/FDX?PARAM=0')
-        cmdDAX = urllib.request.urlopen('http://localhost:13522/api/Radio/DAX?PARAM=0')
+        cmd = urllib.request.urlopen(MOXto0)
+        cmdFDX = urllib.request.urlopen(FDXto0)
+        cmdDAX = urllib.request.urlopen(DAXto0)
